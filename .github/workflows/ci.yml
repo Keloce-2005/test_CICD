@@ -1,0 +1,34 @@
+name: CI - Validation du projet
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v7
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+          cache: npm
+
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Lancer les tests
+        run: npm test
+
+      - name: Ajouter le statut et le commit au resume
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          COMMIT_REF: ${{ github.sha }}
+        run: |
+          echo "## Resultat de la CI" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Statut du job : $JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit : $COMMIT_REF" >> "$GITHUB_STEP_SUMMARY"
