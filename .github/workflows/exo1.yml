@@ -1,4 +1,4 @@
-name: CI - Validation du projet
+name: exo1
 
 on:
   push:
