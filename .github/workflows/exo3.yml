@@ -1,0 +1,107 @@
+name: Build, test and deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environnement de déploiement
+        type: choice
+        required: true
+        default: staging
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v7
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Construire l'application
+        run: npm run build
+
+      - name: Publier le build
+        uses: actions/upload-artifact@v7
+        with:
+          name: application
+          path: dist/
+
+  test:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        node-version:
+          - 20
+          - 22
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v7
+
+      - name: Installer Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Télécharger le build
+        uses: actions/download-artifact@v7
+        with:
+          name: application
+          path: dist/
+
+      - name: Tester l'application
+        run: npm test
+
+  deploy:
+    needs:
+      - build
+      - test
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.target }}
+    permissions:
+      contents: read
+    steps:
+      - name: Télécharger le build
+        uses: actions/download-artifact@v7
+        with:
+          name: application
+          path: dist/
+
+      - name: Afficher la cible de déploiement
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          echo "Déploiement vers l'environnement ${{ inputs.target }}"
+          echo "API_URL=$API_URL"
+
+      - name: Résumer le déploiement
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          echo "## Déploiement" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environnement : ${{ inputs.target }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API URL : $API_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit : ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
